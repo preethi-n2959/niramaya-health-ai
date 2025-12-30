@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     // This securely passes the environment variable from Vercel's build environment to your client app
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
+    // We default to '' to ensure the build doesn't crash if the variable is missing locally
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || '')
   }
 })
