@@ -1,14 +1,6 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import { HealthReport, UserData } from "../types";
 
-// Declare process to avoid TypeScript errors during build (tsc)
-// This lets the compiler know that 'process.env.API_KEY' will be defined (replaced by Vite)
-declare const process: {
-  env: {
-    API_KEY: string | undefined;
-  };
-};
-
 // Helper to decode base64 to Uint8Array
 const base64ToUint8Array = (base64String: string): Uint8Array => {
   const binaryString = atob(base64String);
@@ -19,19 +11,19 @@ const base64ToUint8Array = (base64String: string): Uint8Array => {
   return bytes;
 };
 
-// Access the API Key injected by Vite during the build
-// We allow empty string fallback to prevent runtime crash if variable is missing
-const rawApiKey = process.env.API_KEY || "";
-const apiKey = rawApiKey.replace(/"/g, ''); // Remove accidental quotes from env vars
-
-const ai = new GoogleGenAI({ apiKey });
+// Initialize the Gemini client
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const validateApiKey = (): { valid: boolean; error?: string } => {
+  const apiKey = process.env.API_KEY;
   if (!apiKey) {
     return { valid: false, error: "API Key is missing. Please check your Vercel Environment Variables." };
   }
   
-  if (apiKey.startsWith("vck_")) {
+  // Clean up any potential formatting issues with the key
+  const cleanKey = apiKey.replace(/"/g, '').trim();
+
+  if (cleanKey.startsWith("vck_")) {
     return { 
       valid: false, 
       error: "Configuration Error: You are using a Vercel AI Key ('vck_...'). This app requires a standard Google Cloud API Key (starting with 'AIza...'). Please update the API_KEY environment variable in Vercel Settings." 
@@ -64,7 +56,7 @@ export const generateHealthReport = async (
   `;
 
   try {
-    // Using gemini-3-flash-preview for reliable text generation
+    // Using gemini-3-flash-preview for reliable text generation and speed
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
@@ -89,7 +81,6 @@ export const generateHealthReport = async (
     }
   } catch (error: any) {
     console.error("Report Generation Error:", error);
-    // Propagate the actual error message for debugging
     throw new Error(error.message || "Failed to connect to Gemini API");
   }
 };
@@ -132,7 +123,6 @@ export const createAudioBufferFromPCM = (
   ctx: AudioContext, 
   sampleRate: number = 24000 // Default for Gemini TTS
 ): AudioBuffer => {
-  // Ensure we only read complete 16-bit samples to prevent range errors
   const numSamples = Math.floor(data.byteLength / 2);
   const dataInt16 = new Int16Array(data.buffer, data.byteOffset, numSamples);
   
@@ -141,7 +131,6 @@ export const createAudioBufferFromPCM = (
   
   const channelData = buffer.getChannelData(0);
   for (let i = 0; i < numSamples; i++) {
-    // Normalize 16-bit integer (-32768 to 32767) to float (-1.0 to 1.0)
     channelData[i] = dataInt16[i] / 32768.0;
   }
   
